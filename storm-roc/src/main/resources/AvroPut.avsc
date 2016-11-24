@@ -1,0 +1,32 @@
+{ 
+  "type" : "record",
+  "namespace" : "com.sugon.roc.hbase",
+  "name" : "AvroPut",
+  "fields" : [ {
+    "name" : "row",
+    "type" : "bytes"
+  }, {
+    "name" : "columnValues",
+    "type" : {
+    "type" : "array",
+    "items" : {
+      "type" : "record",
+      "namespace" : "com.sugon.roc.hbase",
+      "name" : "AvroColumnValue",
+      "fields" : [ {
+        "name" : "family",
+        "type" : "bytes"
+        }, {
+        "name" : "qualifier",
+        "type" : "bytes"
+       }, {
+       "name" : "value",
+       "type" : "bytes"
+      }, {
+      "name" : "timestamp",
+      "type" : [ "long", "null" ]
+      } ]
+    }
+    }
+  }]
+}
