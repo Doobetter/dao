@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- 
+模板使用说明：   文本型数据流从Kafka经过Customer的处理之后写入HDFS
+ 1.需要写代码继承CustomerETLBolt或者IRichBolt
+ 2.配置文件中需要改动的地方会有注释说明 
+
+for SimpleCustormerBolt1.java and  SimpleCustormerBolt2.java
+     the differents of the two example:
+     1.SimpleCustormerBolt1.java extends CustomerETLBolt.java and override the ETL function
+     2.SimpleCustormerBolt2.java implements IRichBolt,so user can use storm's natural API
+     set <processClass>example.hdfs02.SimpleCustomerBolt1</processClass>     
+-->
+<!-- topology的id需要全局唯一  -->
+<topology id="roc-example-string-kafka-customer-text-hdfs">
+  <properties>
+    <!-- 添加其他属性的方法：从topology-common.xml中topology标签下的properties中copy -->
+    <property>
+      <name>topology.workers</name>
+      <value>1</value>
+    </property>
+  </properties>
+  <components>
+    <!-- spout 的id在topology的组件内部唯，type一般为kafka-spout -->
+    <spout id="S_1_KAFKA" type="kafka-spout">
+      <properties>
+        <!-- 以下参数为常用的参数，添加其他属性的方法：从topology-common.xml中kafka-spout标签下的properties中copy -->
+        <property>
+          <!-- storm-kafka组件需要的zkRoot，根据实际情况修改 -->
+          <name>kafka.zkRoot</name>
+          <value>/storm-kafka-spout</value>
+        </property>
+        <property>
+          <!-- 该Spout的线程数 -->
+          <name>spout.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+        <!-- 需要根据实际的topic名进行更改 -->
+          <name>kafka.topic</name>
+          <value>example_1_str</value>
+        </property>
+        <property>
+        <!-- 需要根据Kafka集群的实际IP和端口更改 -->
+          <name>kafka.zookeeper.hosts</name>
+          <value>10.0.31.195:2181,10.0.31.197:2181,10.0.31.199:2181/kafka
+          </value>
+        </property>
+        <property>
+          <!-- 测试时设置为true，生产环境设置为false -->
+          <name>kafka.isForceFromStart</name>
+          <value>true</value>
+        </property>
+      </properties>
+    </spout>
+    
+    <!-- bolt的id在当前topology内部唯一，类型设置为customer-bolt -->
+    <bolt id="B_PARSE_1" type="customer-bolt">
+      <dependencies>
+        <!-- 可以有多个 dependency,每个dependency的componentID和streamID是联合主键-->
+        <dependency>
+          <!-- componentID 为当前Topology中已有的组件 -->
+          <componentID>S_1_KAFKA</componentID>
+          <!-- 为所依赖的component中输出的streamID，在declareOutputFields中有明确的定义，如果不写，默认为default -->
+          <streamID>default</streamID>
+          <!-- 可选择shuffle/fields/all，是Storm中的Stream Grouping所支持的 -->
+          <streamGrouping>shuffle</streamGrouping>
+          <tupleSchema>
+            <!-- for tuple's fileds,如果有多个field，他们是有序的 -->
+            <fieldSchema>
+              <!-- field的名字  -->
+              <name>var1</name>
+              <!-- 类型可选择 string/avro/kryo/avro-put/kryo-put -->
+              <type>string</type>
+              <!-- schemaClazz在type为string时为该filed中的数据的分隔符，当type为avro、kryo、avro-put、kryo-put时为其类名，
+                                                         如  avro-put的类名为com.travelsky.roc.hbase.AvroPut
+                     kryo-put的类名为com.travelsky.roc.hbase.KryoPut                                        
+               -->
+              <schemaClazz>\001</schemaClazz>
+            </fieldSchema>
+          </tupleSchema>
+        </dependency>
+      </dependencies>
+      <emits>
+        <!-- 可以有多个 emit,每个dependency的streamID是主键-->
+        <emit>
+          <!-- 为输出数据流的streamID，会在declareOutputFields中使用，如果不写，默认为default -->
+          <streamID>default</streamID>
+          <tupleSchema>
+            <!-- for tuple's fileds,如果有多个field，他们是有序的 -->
+            <fieldSchema>
+                <!-- field的名字  -->
+                <name>var1</name>
+                <!-- 类型可选择 string/avro/kryo/avro-put/kryo-put -->
+                <type>string</type>
+                <!-- schemaClazz在type为string时为该filed中的数据的分隔符，当type为avro、kryo、avro-put、kryo-put时为其类名，
+                                                           如  avro-put的类名为com.travelsky.roc.hbase.AvroPut
+                       kryo-put的类名为com.travelsky.roc.hbase.KryoPut                                        
+                 -->
+                <schemaClazz>\001</schemaClazz>
+            </fieldSchema>
+          </tupleSchema>
+        </emit>
+      </emits>
+      <!-- 自定义的Bolt的类路径 -->
+      <processClass>example.hdfs02.SimpleCustomerBolt3</processClass>
+      <properties>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+        <!-- 如果需要其他参数，直接添加一个property标签，name在当前组件唯一，在自定义的程序中通过Props变量获取 -->
+      </properties>
+    </bolt>
+  </components>
+</topology>

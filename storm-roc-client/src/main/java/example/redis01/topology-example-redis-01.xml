@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+模板使用说明：   文本型数据流从Kafka，经kafka-spout消费拉取数据，经自定义的bolt处理后写入redis
+ 1.需要自定义的CustomerBolt生成RedisTuple
+ 2.配置文件中需要改动的地方会有注释说明 
+ -->
+<topology id="roc-example-text-kafka-customer1-redis">
+  <properties>
+    <property>
+      <name>topology.workers</name>
+      <value>1</value>
+    </property>
+  </properties>
+  <components>
+    <!-- kafka spout -->
+    <spout id="S_1_KAFKA" type="kafka-spout">
+      <properties>
+        <property>
+          <name>kafka.zkRoot</name>
+          <value>/storm-kafka-spout</value>
+        </property>
+        <property>
+          <name>spout.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+          <name>kafka.topic</name>
+          <value>cltgxx_1</value>
+        </property>
+        <property>
+          <name>kafka.zookeeper.hosts</name>
+          <value>10.0.31.195:2181,10.0.31.197:2181,10.0.31.199:2181/kafka</value>
+        </property>
+        <property>
+          <name>kafka.isForceFromStart</name>
+          <value>true</value>
+        </property>
+      </properties>
+    </spout>
+
+      <!-- customer bolt -->
+     <bolt id="B_1_PARSE" type="customer-bolt">
+       <dependencies>
+        <dependency>
+          <componentID>S_1_KAFKA</componentID>
+          <streamGrouping>shuffle</streamGrouping>
+         </dependency>
+      </dependencies>
+       <emits>
+        <emit>
+          <!-- 如果不写，需要在Bolt代码中手动指定  -->
+          <streamID>default</streamID>
+          <tupleSchema>
+            <fieldSchema>
+              <name>var1</name>
+              <type>kryo</type>
+              <schemaClazz>com.travelsky.roc.redis.KryoRedisTuple</schemaClazz>
+            </fieldSchema>
+          </tupleSchema>
+        </emit>
+      </emits>
+      <!--自定义的bolt路径  -->
+      <processClass>example.redis01.CustomerBolt1</processClass>
+      <properties>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+      </properties>
+    </bolt>
+
+    <!--Redis Bolt id在当前topology中唯一，type设置为redis-bolt  -->
+    <bolt id="B_1_1_Redis" type="redis-bolt">
+      <dependencies>
+        <dependency>
+          <componentID>B_1_PARSE</componentID>
+          <streamGrouping>shuffle</streamGrouping>
+        </dependency>
+      </dependencies>
+      <properties>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+          <!-- redis cluster 的主机和端口，以,分隔 -->
+          <name>redis.hostAndPort</name>
+          <value>10.0.31.188:17000,10.0.31.189:17000,10.0.31.190:17000</value>
+        </property>
+        <property>
+          <!-- redis command time out 的时间，单位为秒 -->
+          <name>redis.commandTimeout</name>
+          <value>1</value>
+        </property>
+        <property>
+          <!--在集群上重定向的次数  -->
+          <name>redis.maxRedirections</name>
+          <value>5</value>
+        </property>
+      </properties>
+    </bolt>
+  </components>
+</topology>

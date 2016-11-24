@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<topology id="roc-avro-user-to-hdfs">
+  <properties>
+    <property>
+      <name>topology.workers</name>
+      <value>1</value>
+    </property>
+  </properties>
+  <components>
+
+    <!-- kafka spout -->
+    <spout id="S_1_KAFKA" type="kafka-spout">
+      <properties>
+        <property>
+          <name>kafka.zkRoot</name>
+          <value>/storm-kafka-test</value>
+        </property>
+        <property>
+          <name>spout.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+          <name>kafka.topic</name>
+          <value>test-avro-user</value>
+        </property>
+        <property>
+          <name>kafka.zookeeper.hosts</name>
+          <value>10.0.31.191/kafka</value>
+        </property>
+        <property>
+          <name>kafka.isForceFromStart</name>
+          <value>true</value>
+        </property>
+      </properties>
+    </spout>
+    
+    <!-- no  customer bolt -->
+  <bolt id="B_1_PARSE" type="customer-bolt">
+       <dependencies>
+        <!-- 可以有多个 dependency,每个dependency的componentID和streamID是联合主键-->
+        <dependency>
+          <!-- componentID 为当前Topology中已有的组件 -->
+          <componentID>S_1_KAFKA</componentID>
+          <!-- 为所依赖的component中输出的streamID，在declareOutputFields中有明确的定义，如果不写，默认为default -->
+          <streamID>default</streamID>
+          <!-- 可选择shuffle/fields/all，是Storm中的Stream Grouping所支持的 -->
+          <streamGrouping>shuffle</streamGrouping>
+          <!-- customer-bolt中可以不用写    
+          <tupleSchema></tupleSchema>
+           -->
+         </dependency>
+      </dependencies>
+       <emits>
+        <!-- 可以有多个 emit,每个dependency的streamID是主键-->
+        <emit>
+          <!-- 为输出数据流的streamID，会在declareOutputFields中使用，如果不写，默认为default -->
+          <streamID>default</streamID>
+          <tupleSchema>
+            <!-- for tuple's fileds,如果有多个field，他们是有序的 -->
+            <fieldSchema>
+                <!-- field的名字  -->
+                <name>var1</name>
+                <!-- 类型可选择 string/avro/kryo/avro-put/kryo-put -->
+                <type>avro</type>
+                <!--   avro-put的类名为com.travelsky.roc.hbase.AvroPut -->
+                <schemaClazz>example.hdfs04.User</schemaClazz>
+              </fieldSchema>
+            </tupleSchema>
+        </emit>
+      </emits>
+      <!-- 自定义的Bolt的类路径 -->
+      <processClass>example.hdfs04.NormalAvroParseCustormerBolt</processClass>
+      <properties>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+        <!-- 如果需要其他参数，直接添加一个property标签，name在当前组件唯一，在自定义的程序中通过Props变量获取 -->
+      </properties>
+    </bolt>
+    
+    <!-- hdfs bolt -->
+    <bolt id="B_1_1_HDFS" type="avro-hdfs-bolt">
+      <dependencies>
+        <dependency>
+          <componentID>B_1_PARSE</componentID>
+          <streamID>default</streamID>
+          <!-- 可选择shuffle/fields/all，是Storm中的Stream Grouping所支持的 -->
+          <streamGrouping>shuffle</streamGrouping>
+          <tupleSchema>
+          	<fieldSchema>
+          		<name>var1</name>
+            	<type>avro</type>
+            	<schemaClazz>example.hdfs04.User</schemaClazz>
+           </fieldSchema>
+          </tupleSchema>
+        </dependency>
+      </dependencies>
+      <properties>
+        <property>
+          <name>hdfs.sync.interval.tuple</name>
+          <value>100</value>
+        </property>
+        <property>
+          <name>hdfs.output.path</name>
+          <value>/tmp/avro/user1/</value>
+        </property>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+          <name>hdfs.rotation.time.interval</name>
+          <value>600000</value>
+        </property>
+        <property>
+          <name>hdfs.output.filename.prefix</name>
+          <value>user</value>
+        </property>
+        <property>
+          <name>hdfs.rotation.fileSize</name>
+          <value>10*1024*1024</value>
+        </property>
+        <property>
+          <name>hdfs.tickFreSec</name>
+          <value>5</value>
+        </property>
+        <property>
+          <name>hdfs.userName</name>
+          <value>etluser</value>
+        </property>
+<!--         <property>
+          <name>hdfs.avro.schema</name>
+          <value>com.travelsky.roc.hbase.AvroPut</value>
+        </property> -->
+      </properties>
+    </bolt>
+  </components>
+</topology>

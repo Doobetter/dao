@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 模板使用说明： kryo-put数据直接从Kafka,经过两个自定义的Bolt处理后写入HBase 1.需要自定义Bolt 2.配置文件中需要改动的地方会有注释说明 -->
+
+<!-- topology的id需要全局唯一 -->
+<topology id="roc-example-kryoPut-kafka-customer1-customer2-hbase">
+  <properties>
+    <!-- 添加其他属性的方法：从topology-common.xml中topology标签下的properties中copy -->
+    <property>
+      <name>topology.workers</name>
+      <value>1</value>
+    </property>
+  </properties>
+  <components>
+    <!-- spout 的id在topology的组件内部唯，type一般为kafka-spout -->
+    <spout id="S_1_KAFKA" type="kafka-spout">
+      <properties>
+        <!-- 以下参数为常用的参数，添加其他属性的方法：从topology-common.xml中kafka-spout标签下的properties中copy -->
+        <property>
+          <name>kafka.zkRoot</name>
+          <value>/storm-kafka-spout</value>
+        </property>
+        <property>
+          <name>spout.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+          <name>kafka.topic</name>
+          <value>example_3_kryoPut</value>
+        </property>
+        <property>
+          <!-- 需要根据Kafka集群的实际IP和端口更改 -->
+          <name>kafka.zookeeper.hosts</name>
+          <value>10.0.31.195:2181,10.0.31.197:2181,10.0.31.199:2181/kafka
+          </value>
+        </property>
+        <property>
+          <name>kafka.isForceFromStart</name>
+          <value>true</value>
+        </property>
+      </properties>
+    </spout>
+
+    <!-- customer bolt -->
+    <bolt id="B_1_PARSE" type="customer-bolt">
+      <dependencies>
+        <dependency>
+          <componentID>S_1_KAFKA</componentID>
+          <!-- 省略streamID，为所依赖的component中输出的streamID，在declareOutputFields中有明确的定义，如果不写，默认为default -->
+          <streamGrouping>shuffle</streamGrouping>
+        </dependency>
+      </dependencies>
+      <emits>
+        <emit>
+          <!-- 省略streamID，为所依赖的component中输出的streamID，在declareOutputFields中有明确的定义，如果不写，默认为default -->
+          <tupleSchema>
+            <!-- for tuple's fileds -->
+            <fieldSchema>
+              <name>var1</name>
+              <type>kryo-put</type>
+              <schemaClazz>com.travelsky.roc.hbase.KryoPut</schemaClazz>
+            </fieldSchema>
+          </tupleSchema>
+        </emit>
+      </emits>
+      <processClass>example.hbase04.CustomerBolt1</processClass>
+      <properties>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+      </properties>
+    </bolt>
+    <!-- customer bolt -->
+    <bolt id="B_1_1_PARSE" type="customer-bolt">
+      <dependencies>
+        <dependency>
+          <componentID>B_1_PARSE</componentID>
+          <!-- 省略streamID，为所依赖的component中输出的streamID，在declareOutputFields中有明确的定义，如果不写，默认为default -->
+          <streamGrouping>shuffle</streamGrouping>
+        </dependency>
+      </dependencies>
+      <emits>
+        <emit>
+          <streamID>1</streamID>
+          <tupleSchema>
+            <!-- for tuple's fileds -->
+            <fieldSchema>
+              <name>var1</name>
+              <type>kryo-put</type>
+              <schemaClazz>com.travelsky.roc.hbase.KryoPut</schemaClazz>
+            </fieldSchema>
+          </tupleSchema>
+        </emit>
+      </emits>
+      <!-- 自定义的Bolt的类路径 -->
+      <processClass>example.hbase04.CustomerBolt2</processClass>
+      <properties>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+        <!-- 如果需要其他参数，直接添加一个property标签，name在当前组件唯一，在自定义的程序中通过Props变量获取 -->
+      </properties>
+    </bolt>
+
+    <!-- bolt的id在当前topology内部唯一，类型设置为hbase-bolt -->
+    <bolt id="B_1_1_1_HBase" type="hbase-bolt">
+      <dependencies>
+        <dependency>
+          <!-- componentID 为当前Topology中已有的组件 -->
+          <componentID>B_1_1_PARSE</componentID>
+          <!-- streamID为所依赖的component中输出的streamID，在declareOutputFields中有明确的定义，如果不写，默认为default -->
+          <tupleSchema>
+            <!-- field的名字 ，此处可以不写，默认取tuple的第一个值-->  
+            <type>kryo-put</type>
+            <schemaClazz>com.travelsky.roc.hbase.KryoPut</schemaClazz>
+          </tupleSchema>
+        </dependency>
+      </dependencies>
+      <properties>
+        <property>
+          <name>hadoop.conf.path</name>
+          <value>/usr/local/share/storm/hadoop-conf</value>
+        </property>
+        <property>
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+          <name>hbase.tableName</name>
+          <value>user_info</value>
+        </property>
+        <property>
+          <name>hbase.manualFlushLimit</name>
+          <value>1000</value>
+        </property>
+        <property>
+          <name>hbase.writeBufferSize</name>
+          <value>16777216</value>
+        </property>
+        <property>
+          <name>hbase.statusCheckInterval</name>
+          <value>300</value>
+        </property>
+        <property>
+          <name>hbase.isHBaseFailedHandlerON</name>
+          <value>false</value>
+        </property>
+      </properties>
+    </bolt>
+  </components>
+</topology>

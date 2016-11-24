@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  This configuration file can be used where is no need of customer programming , as no ETL process
+模板使用说明：   文本型数据流从Kafka到HDFS
+ 1.不需要写代码
+ 2.配置文件中需要改动的地方会有注释说明 
+-->
+
+<!-- topology的id需要全局唯一  -->
+<topology id="roc-example-string-kafka-text-hdfs">
+  <properties>
+    <!-- 添加其他属性的方法：从topology-common.xml中topology标签下的properties中copy -->
+    <property>
+      <name>topology.workers</name>
+      <value>1</value>
+    </property>
+  </properties>
+  <components>
+    <!-- spout 的id在topology的组件内部唯，type一般为kafka-spout -->
+    <spout id="S_1_KAFKA" type="kafka-spout">
+      <properties>
+        <!-- 以下参数为常用的参数，添加其他属性的方法：从topology-common.xml中kafka-spout标签下的properties中copy -->
+        <property>
+          <!-- storm-kafka组件需要的zkRoot，根据实际情况修改 -->
+          <name>kafka.zkRoot</name>
+          <value>/storm-kafka-spout</value>
+        </property>
+        <property>
+          <!-- 该Spout的线程数 -->
+          <name>spout.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+        <!-- 需要根据实际的topic名进行更改 -->
+          <name>kafka.topic</name>
+          <value>example_1_str</value>
+        </property>
+        <property>
+        <!-- 需要根据Kafka集群的实际IP和端口更改 -->
+          <name>kafka.zookeeper.hosts</name>
+          <value>10.0.31.195:2181,10.0.31.197:2181,10.0.31.199:2181/kafka
+          </value>
+        </property>
+        <property>
+          <!-- 测试时设置为true，生产环境设置为false -->
+          <name>kafka.isForceFromStart</name>
+          <value>true</value>
+        </property>
+      </properties>
+    </spout>
+
+    <!-- bolt 的id在topology的组件内部唯，此处存储TEXT型数据的Bolt，type设置为text-hdfs-bolt -->
+    <bolt id="B_1_1_HDFS" type="text-hdfs-bolt">
+      <dependencies>
+        <!-- 可以有多个 dependency,每个dependency的componentID和streamID是联合主键-->
+        <dependency>
+          <!-- componentID 为当前Topology中已有的组件 -->
+          <componentID>S_1_KAFKA</componentID>
+          <!-- 为所依赖的component中输出的streamID，在declareOutputFields中有明确的定义，如果不写，默认为default -->
+          <streamID>default</streamID>
+          <!-- 可选择shuffle/fields/all，是Storm中的Stream Grouping所支持的 -->
+          <streamGrouping>shuffle</streamGrouping>
+          <!-- text-hdfs-bolt的tupleSchema已经确定不用配置 -->
+        </dependency>
+      </dependencies>
+      <!-- text-hdfs-bolt 没有emits标签 -->
+      <properties>
+        <!-- 以下参数为常用的参数，添加其他属性的方法：从topology-common.xml中text-hdfs-bolt标签下的properties中copy -->
+        <property>
+          <!-- 写入hdfs的数据每多少条就hflush一次，机器好推荐为5000，机器性能差推荐为1000 -->
+          <name>hdfs.sync.interval.tuple</name>
+          <value>1000</value>
+        </property>
+        <property>
+          <!-- 所需的hadoop配置文件的位置，在每个storm节点上必须有，覆盖了topology-common.xml中的设置 -->
+          <name>hadoop.conf.path</name>
+          <value>/usr/local/share/storm/hadoop-conf</value>
+        </property>
+        <property>
+          <!-- 写入HDFS的文件路径，需要用户根据实际情况更改指定 -->
+          <name>hdfs.output.path</name>
+          <value>/user/storm/example_1_str</value>
+        </property>
+        <property>
+          <!-- 该Bolt的线程数 -->
+          <name>bolt.executorNumber</name>
+          <value>1</value>
+        </property>
+        <property>
+          <!-- 隔多少毫秒，重新生成一个新的文件 -->
+          <name>hdfs.rotation.time.interval</name>
+          <value>3600000</value>
+        </property>
+        <property>
+          <!-- hdfs文件前缀 -->
+          <name>hdfs.output.filename.prefix</name>
+          <value>sugon</value>
+        </property>
+        <property>
+          <!-- hdfs文件大小多少之后，重新生成一个新的文件 -->
+          <name>hdfs.rotation.fileSize</name>
+          <value>10*1024*1024</value>
+        </property>
+        <property>
+          <!-- 如果没有数据流，hflush和重新生成文件的时间间隔，单位秒 -->
+          <name>hdfs.tickFreSec</name>
+          <value>500</value>
+        </property>
+        <property>
+          <!-- hadoop的用户名  -->
+          <name>hdfs.userName</name>
+          <value>storm</value>
+        </property>
+        <property>
+          <!-- 记录与记录之间的分隔符，支持字符串 -->
+          <name>hdfs.text.delimer</name>
+          <value>AAA</value>
+        </property>
+      </properties>
+    </bolt>
+  </components>
+</topology>
